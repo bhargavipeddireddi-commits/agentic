@@ -6,13 +6,19 @@ import ReactMarkdown from 'react-markdown'; // I should have installed this, let
 
 const Assistant = () => {
   const { user } = useAuthStore();
-  const [messages, setMessages] = useState([
-    { 
-      role: 'assistant', 
-      content: `Hello ${user?.profile?.fullName || 'there'}! I'm your Student Support Agent. How can I help you with your academic needs today?`,
-      timestamp: new Date()
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      setMessages([
+        { 
+          role: 'assistant', 
+          content: `Hello ${user?.profile?.fullName || 'there'}! I'm your Academic AI Assistant. How can I help you with your exams, electives, or career goals today?`,
+          timestamp: new Date()
+        }
+      ]);
     }
-  ]);
+  }, [user]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
@@ -25,20 +31,29 @@ const Assistant = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const suggestions = [
+    "When is my next exam?",
+    "Show elective recommendations",
+    "What is the attendance policy?",
+    "Show my profile details",
+    "What are the career prospects?",
+    "Campus events this week"
+  ];
 
-    const userMessage = { role: 'user', content: input, timestamp: new Date() };
+  const handleSend = async (textToSubmit) => {
+    const query = typeof textToSubmit === 'string' ? textToSubmit : input;
+    if (!query.trim() || loading) return;
+
+    const userMessage = { role: 'user', content: query, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
     try {
-      const response = await API.post('/assistant/query', { query: input });
+      const response = await API.post('/assistant/query', { query });
       const assistantMessage = { 
         role: 'assistant', 
-        content: response.data.response, 
+        content: response.data.response || response.data || "I'm not sure how to answer that. Could you rephrase?", 
         timestamp: new Date() 
       };
       setMessages(prev => [...prev, assistantMessage]);
@@ -52,13 +67,6 @@ const Assistant = () => {
       setLoading(false);
     }
   };
-
-  const suggestions = [
-    "When is my next exam?",
-    "Show available electives",
-    "What is the attendance policy?",
-    "Show academic events this week"
-  ];
 
   return (
     <div className="flex flex-col h-[calc(100vh-160px)] max-w-4xl mx-auto border border-border rounded-2xl bg-white shadow-sm overflow-hidden">
@@ -114,20 +122,21 @@ const Assistant = () => {
 
       {/* Footer / Input */}
       <div className="p-6 border-t border-border bg-white">
-        {messages.length === 1 && (
+        {(messages.length === 1 || messages[messages.length - 1]?.content?.toLowerCase().includes('help') || messages[messages.length - 1]?.content?.toLowerCase().includes('assistant')) && (
           <div className="flex flex-wrap gap-2 mb-4">
             {suggestions.map((s, i) => (
               <button 
                 key={i} 
-                onClick={() => setInput(s)}
-                className="text-xs font-semibold px-3 py-2 bg-gray-50 border border-border rounded-full hover:bg-primary hover:text-white hover:border-primary transition-all"
+                onClick={() => handleSend(s)}
+                disabled={loading}
+                className="text-xs font-semibold px-3 py-2 bg-gray-50 border border-border rounded-full hover:bg-primary hover:text-white hover:border-primary transition-all disabled:opacity-50"
               >
                 {s}
               </button>
             ))}
           </div>
         )}
-        <form onSubmit={handleSend} className="relative">
+        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
